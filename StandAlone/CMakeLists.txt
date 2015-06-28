@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-include_directories(.)
+include_directories(. ..)
 if(WIN32)
     include_directories(../glslang/OSDependent/Windows)
 elseif(UNIX)
@@ -14,6 +14,9 @@ set(REMAPPER_SOURCES spirv-remap.cpp)
 
 add_executable(glslangValidator ${SOURCES})
 add_executable(spirv-remap ${REMAPPER_SOURCES})
+
+set_target_properties(glslangValidator PROPERTIES FOLDER "glslang")
+set_target_properties(spirv-remap PROPERTIES FOLDER "glslang")
 
 set(LIBRARIES
     glslang

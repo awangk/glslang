@@ -20,6 +20,8 @@ set(HEADERS
 
 add_library(SPIRV STATIC ${SOURCES} ${HEADERS})
 
+set_target_properties(SPIRV PROPERTIES FOLDER "glslang")
+
 if(WIN32)
     source_group("Source" FILES ${SOURCES} ${HEADERS})
 endif(WIN32)

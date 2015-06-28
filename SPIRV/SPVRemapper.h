@@ -101,8 +101,8 @@ public:
 #include <set>
 #include <cassert>
 
-#include "../../glslang/SPIRV/spirv.h"
-#include "../../glslang/SPIRV/spvIR.h"
+#include "SPIRV/spirv.h"
+#include "SPIRV/spvIR.h"
 
 namespace spv {
 
