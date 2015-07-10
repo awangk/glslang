@@ -101,8 +101,8 @@ public:
 #include <set>
 #include <cassert>
 
-#include "SPIRV/spirv.h"
-#include "SPIRV/spvIR.h"
+#include "spirv.h"
+#include "spvIR.h"
 
 namespace spv {
 
@@ -111,7 +111,7 @@ class spirvbin_t : public spirvbin_base_t
 {
 public:
    spirvbin_t(int verbose = 0) : entryPoint(spv::NoResult), largestNewId(0), verbose(verbose) { }
-   
+
    // remap on an existing binary in memory
    void remap(std::vector<std::uint32_t>& spv, std::uint32_t opts = DO_EVERYTHING);
 
@@ -169,7 +169,7 @@ private:
    range_t literalRange(spv::Op opCode)    const;
    range_t typeRange(spv::Op opCode)       const;
    range_t constRange(spv::Op opCode)      const;
-   
+
    spv::Id&        asId(unsigned word)                { return spv[word]; }
    const spv::Id&  asId(unsigned word)          const { return spv[word]; }
    spv::Op         asOpCode(unsigned word)      const { return opOpCode(spv[word]); }
@@ -235,7 +235,7 @@ private:
    void        mapRemainder();        // map any IDs we haven't touched yet
    void        stripDebug();          // strip debug info
    void        strip();               // remove debug symbols
-   
+
    std::vector<spirword_t> spv;      // SPIR words
 
    namemap_t               nameMap;  // ID names from OpName
@@ -262,10 +262,10 @@ private:
 
    // Which functions are called, anywhere in the module, with a call count
    std::unordered_map<spv::Id, int> fnCalls;
-   
+
    posmap_t     typeConstPos;   // word positions that define types & consts (ordered)
    posmap_rev_t typeConstPosR;  // reverse map from IDs to positions
-   
+
    std::vector<spv::Id>  idMapL;   // ID {M}ap from {L}ocal to {G}lobal IDs
 
    spv::Id entryPoint;      // module entry point

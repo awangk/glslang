@@ -730,12 +730,12 @@ TIntermTyped* TParseContext::handleDotDereference(TSourceLoc loc, TIntermTyped* 
     //
     if (field == "length") {
         if (base->isArray()) {
-            profileRequires(loc, ENoProfile, 120, GL_3DL_array_objects, ".length");
+            profileRequires(loc, ENoProfile, 120, E_GL_3DL_array_objects, ".length");
             profileRequires(loc, EEsProfile, 300, nullptr, ".length");
         } else if (base->isVector() || base->isMatrix()) {
             const char* feature = ".length() on vectors and matrices";
             requireProfile(loc, ~EEsProfile, feature);
-            profileRequires(loc, ~EEsProfile, 420, GL_ARB_shading_language_420pack, feature);
+            profileRequires(loc, ~EEsProfile, 420, E_GL_ARB_shading_language_420pack, feature);
         } else {
             error(loc, "does not operate on this type:", field.c_str(), base->getType().getCompleteString().c_str());
 
@@ -761,7 +761,7 @@ TIntermTyped* TParseContext::handleDotDereference(TSourceLoc loc, TIntermTyped* 
         if (base->isScalar()) {
             const char* dotFeature = "scalar swizzle";
             requireProfile(loc, ~EEsProfile, dotFeature);
-            profileRequires(loc, ~EEsProfile, 420, GL_ARB_shading_language_420pack, dotFeature);
+            profileRequires(loc, ~EEsProfile, 420, E_GL_ARB_shading_language_420pack, dotFeature);
         }
 
         TVectorFields fields;
@@ -1310,13 +1310,13 @@ void TParseContext::nonOpBuiltInCheck(TSourceLoc loc, const TFunction& fnCandida
             if (fnCandidate.getName().compare("textureGatherOffset") == 0) {
                 // GL_ARB_texture_gather is good enough for 2D non-shadow textures with no component argument
                 if (fnCandidate[0].type->getSampler().dim == Esd2D && ! fnCandidate[0].type->getSampler().shadow && fnCandidate.getParamCount() == 3)
-                    profileRequires(loc, ~EEsProfile, 400, GL_ARB_texture_gather, feature);
+                    profileRequires(loc, ~EEsProfile, 400, E_GL_ARB_texture_gather, feature);
                 else
-                    profileRequires(loc, ~EEsProfile, 400, GL_ARB_gpu_shader5, feature);
+                    profileRequires(loc, ~EEsProfile, 400, E_GL_ARB_gpu_shader5, feature);
                 if (! fnCandidate[0].type->getSampler().shadow)
                     compArg = 3;
             } else if (fnCandidate.getName().compare("textureGatherOffsets") == 0) {
-                profileRequires(loc, ~EEsProfile, 400, GL_ARB_gpu_shader5, feature);
+                profileRequires(loc, ~EEsProfile, 400, E_GL_ARB_gpu_shader5, feature);
                 if (! fnCandidate[0].type->getSampler().shadow)
                     compArg = 3;
                 // check for constant offsets
@@ -1327,11 +1327,11 @@ void TParseContext::nonOpBuiltInCheck(TSourceLoc loc, const TFunction& fnCandida
                 // More than two arguments needs gpu_shader5, and rectangular or shadow needs gpu_shader5,
                 // otherwise, need GL_ARB_texture_gather.
                 if (fnCandidate.getParamCount() > 2 || fnCandidate[0].type->getSampler().dim == EsdRect || fnCandidate[0].type->getSampler().shadow) {
-                    profileRequires(loc, ~EEsProfile, 400, GL_ARB_gpu_shader5, feature);
+                    profileRequires(loc, ~EEsProfile, 400, E_GL_ARB_gpu_shader5, feature);
                     if (! fnCandidate[0].type->getSampler().shadow)
                         compArg = 2;
                 } else
-                    profileRequires(loc, ~EEsProfile, 400, GL_ARB_texture_gather, feature);
+                    profileRequires(loc, ~EEsProfile, 400, E_GL_ARB_texture_gather, feature);
             }
 
             if (compArg > 0 && compArg < fnCandidate.getParamCount()) {
@@ -1381,7 +1381,7 @@ void TParseContext::nonOpBuiltInCheck(TSourceLoc loc, const TFunction& fnCandida
 
     // GL_ARB_shader_texture_image_samples
     if (fnCandidate.getName().compare(0, 14, "textureSamples") == 0 || fnCandidate.getName().compare(0, 12, "imageSamples") == 0)
-        profileRequires(loc, ~EEsProfile, 450, GL_ARB_shader_texture_image_samples, "textureSamples and imageSamples");
+        profileRequires(loc, ~EEsProfile, 450, E_GL_ARB_shader_texture_image_samples, "textureSamples and imageSamples");
 
     if (fnCandidate.getName().compare(0, 11, "imageAtomic") == 0) {
         const TType& imageType = callNode.getSequence()[0]->getAsTyped()->getType();
@@ -1402,7 +1402,7 @@ TFunction* TParseContext::handleConstructorCall(TSourceLoc loc, const TPublicTyp
     type.getQualifier().precision = EpqNone;
 
     if (type.isArray()) {
-        profileRequires(loc, ENoProfile, 120, GL_3DL_array_objects, "arrayed constructor");
+        profileRequires(loc, ENoProfile, 120, E_GL_3DL_array_objects, "arrayed constructor");
         profileRequires(loc, EEsProfile, 300, nullptr, "arrayed constructor");
     }
 
@@ -1788,11 +1788,17 @@ void TParseContext::reservedErrorCheck(TSourceLoc loc, const TString& identifier
         if (builtInName(identifier))
             error(loc, "identifiers starting with \"gl_\" are reserved", identifier.c_str(), "");
 
+        // "__" are not supposed to be an error.  ES 310 (and desktop) added the clarification:
         // "In addition, all identifiers containing two consecutive underscores (__) are
         // reserved; using such a name does not itself result in an error, but may result
         // in undefined behavior."
-        if (identifier.find("__") != TString::npos)
-            warn(loc, "identifiers containing consecutive underscores (\"__\") are reserved", identifier.c_str(), "");
+        // however, before that, ES tests required an error.
+        if (identifier.find("__") != TString::npos) {
+            if (profile == EEsProfile && version <= 300)
+                error(loc, "identifiers containing consecutive underscores (\"__\") are reserved, and an error if version <= 300", identifier.c_str(), "");
+            else
+                warn(loc, "identifiers containing consecutive underscores (\"__\") are reserved", identifier.c_str(), "");
+        }
     }
 }
 
@@ -1801,11 +1807,13 @@ void TParseContext::reservedErrorCheck(TSourceLoc loc, const TString& identifier
 //
 void TParseContext::reservedPpErrorCheck(TSourceLoc loc, const char* identifier, const char* op)
 {
+    // "__" are not supposed to be an error.  ES 310 (and desktop) added the clarification:
     // "All macro names containing two consecutive underscores ( __ ) are reserved;
     // defining such a name does not itself result in an error, but may result in
     // undefined behavior.  All macro names prefixed with "GL_" ("GL" followed by a
     // single underscore) are also reserved, and defining such a name results in a
     // compile-time error."
+    // however, before that, ES tests required an error.
     if (strncmp(identifier, "GL_", 3) == 0)
         error(loc, "names beginning with \"GL_\" can't be (un)defined:", op,  identifier);
     else if (strstr(identifier, "__") != 0) {
@@ -1814,8 +1822,12 @@ void TParseContext::reservedPpErrorCheck(TSourceLoc loc, const char* identifier,
              strcmp(identifier, "__FILE__") == 0 ||
              strcmp(identifier, "__VERSION__") == 0))
             error(loc, "predefined names can't be (un)defined:", op,  identifier);
-        else
-            warn(loc, "names containing consecutive underscores are reserved:", op, identifier);
+        else {
+            if (profile == EEsProfile && version <= 300)
+                error(loc, "names containing consecutive underscores are reserved, and an error if version <= 300:", op, identifier);
+            else
+                warn(loc, "names containing consecutive underscores are reserved:", op, identifier);
+        }
     }
 }
 
@@ -1829,7 +1841,7 @@ bool TParseContext::lineContinuationCheck(TSourceLoc loc, bool endOfComment)
     const char* message = "line continuation";
 
     bool lineContinuationAllowed = (profile == EEsProfile && version >= 300) ||
-                                   (profile != EEsProfile && (version >= 420 || extensionsTurnedOn(1, &GL_ARB_shading_language_420pack)));
+                                   (profile != EEsProfile && (version >= 420 || extensionsTurnedOn(1, &E_GL_ARB_shading_language_420pack)));
 
     if (endOfComment) {
         if (lineContinuationAllowed)
@@ -1846,7 +1858,7 @@ bool TParseContext::lineContinuationCheck(TSourceLoc loc, bool endOfComment)
         return true;
     } else {
         profileRequires(loc, EEsProfile, 300, nullptr, message);
-        profileRequires(loc, ~EEsProfile, 420, GL_ARB_shading_language_420pack, message);
+        profileRequires(loc, ~EEsProfile, 420, E_GL_ARB_shading_language_420pack, message);
     }
 
     return lineContinuationAllowed;
@@ -2216,7 +2228,7 @@ void TParseContext::mergeQualifiers(TSourceLoc loc, TQualifier& dst, const TQual
     // Ordering
     if (! force && ((profile != EEsProfile && version < 420) || 
                     (profile == EEsProfile && version < 310))
-                && ! extensionsTurnedOn(1, &GL_ARB_shading_language_420pack)) {
+                && ! extensionsTurnedOn(1, &E_GL_ARB_shading_language_420pack)) {
         // non-function parameters
         if (src.invariant && (dst.isInterpolation() || dst.isAuxiliary() || dst.storage != EvqTemporary || dst.precision != EpqNone))
             error(loc, "invariant qualifier must appear first", "", "");
@@ -2399,7 +2411,7 @@ void TParseContext::arraySizeCheck(TSourceLoc loc, TIntermTyped* expr, int& size
 bool TParseContext::arrayQualifierError(TSourceLoc loc, const TQualifier& qualifier)
 {
     if (qualifier.storage == EvqConst) {
-        profileRequires(loc, ENoProfile, 120, GL_3DL_array_objects, "const array");
+        profileRequires(loc, ENoProfile, 120, E_GL_3DL_array_objects, "const array");
         profileRequires(loc, EEsProfile, 300, nullptr, "const array");
     }
 
@@ -2488,26 +2500,34 @@ void TParseContext::arrayUnsizedCheck(TSourceLoc loc, const TQualifier& qualifie
     arraySizeRequiredCheck(loc, size);
 }
 
-void TParseContext::arrayDimError(TSourceLoc loc)
+void TParseContext::arrayOfArrayVersionCheck(TSourceLoc loc)
 {
-    requireProfile(loc, EEsProfile | ECoreProfile | ECompatibilityProfile, "arrays of arrays");
-    profileRequires(loc, ECoreProfile | ECompatibilityProfile, 430, nullptr, "arrays of arrays");
-    profileRequires(loc, EEsProfile, 310, nullptr, "arrays of arrays");
+    const char* feature = "arrays of arrays";
+
+    requireProfile(loc, EEsProfile | ECoreProfile | ECompatibilityProfile, feature);
+    profileRequires(loc, EEsProfile, 310, nullptr, feature);
+    profileRequires(loc, ECoreProfile | ECompatibilityProfile, 430, nullptr, feature);
+
+    static int once = false;
+    if (! once) {
+        warn(loc, feature, "Not supported yet.", "");
+        once = true;
+    }
 }
 
 void TParseContext::arrayDimCheck(TSourceLoc loc, TArraySizes* sizes1, TArraySizes* sizes2)
 {
     if ((sizes1 && sizes2) ||
-        (sizes1 && sizes1->isArrayOfArrays()) ||
-        (sizes2 && sizes2->isArrayOfArrays()))
-        arrayDimError(loc);
+        (sizes1 && sizes1->getNumDims() > 1) ||
+        (sizes2 && sizes2->getNumDims() > 1))
+        arrayOfArrayVersionCheck(loc);
 }
 
 void TParseContext::arrayDimCheck(TSourceLoc loc, const TType* type, TArraySizes* sizes2)
 {
     if ((type && type->isArray() && sizes2) ||
-        (sizes2 && sizes2->isArrayOfArrays()))
-        arrayDimError(loc);
+        (sizes2 && sizes2->getNumDims() > 1))
+        arrayOfArrayVersionCheck(loc);
 }
 
 //
@@ -2671,7 +2691,7 @@ TSymbol* TParseContext::redeclareBuiltinVariable(TSourceLoc loc, const TString& 
 
     // Special case when using GL_ARB_separate_shader_objects
     bool ssoPre150 = false;  // means the only reason this variable is redeclared is due to this combination
-    if (profile != EEsProfile && version <= 140 && extensionsTurnedOn(1, &GL_ARB_separate_shader_objects)) {
+    if (profile != EEsProfile && version <= 140 && extensionsTurnedOn(1, &E_GL_ARB_separate_shader_objects)) {
         if (identifier == "gl_Position"     ||
             identifier == "gl_PointSize"    ||
             identifier == "gl_ClipVertex"   ||
@@ -2788,7 +2808,7 @@ void TParseContext::redeclareBuiltinBlock(TSourceLoc loc, TTypeList& newTypeList
 {
     const char* feature = "built-in block redeclaration";
     profileRequires(loc, EEsProfile, 0, Num_AEP_shader_io_blocks, AEP_shader_io_blocks, feature);
-    profileRequires(loc, ~EEsProfile, 410, GL_ARB_separate_shader_objects, feature);
+    profileRequires(loc, ~EEsProfile, 410, E_GL_ARB_separate_shader_objects, feature);
 
     if (blockName != "gl_PerVertex" && blockName != "gl_PerFragment") {
         error(loc, "cannot redeclare block: ", "block declaration", blockName.c_str());
@@ -2901,12 +2921,12 @@ void TParseContext::redeclareBuiltinBlock(TSourceLoc loc, TTypeList& newTypeList
     if (type.isArray() != (arraySizes != 0))
         error(loc, "cannot change arrayness of redeclared block", blockName.c_str(), "");
     else if (type.isArray()) {
-        if (type.isExplicitlySizedArray() && arraySizes->getSize() == 0)
+        if (type.isExplicitlySizedArray() && arraySizes->getOuterSize() == 0)
             error(loc, "block already declared with size, can't redeclare as implicitly-sized", blockName.c_str(), "");
-        else if (type.isExplicitlySizedArray() && type.getArraySize() != arraySizes->getSize())
+        else if (type.isExplicitlySizedArray() && type.getArraySize() != arraySizes->getOuterSize())
             error(loc, "cannot change array size of redeclared block", blockName.c_str(), "");
-        else if (type.isImplicitlySizedArray() && arraySizes->getSize() > 0)
-            type.changeArraySize(arraySizes->getSize());
+        else if (type.isImplicitlySizedArray() && arraySizes->getOuterSize() > 0)
+            type.changeArraySize(arraySizes->getOuterSize());
     }
 
     symbolTable.insert(*block);
@@ -2986,7 +3006,7 @@ void TParseContext::arrayObjectCheck(TSourceLoc loc, const TType& type, const ch
 {
     // Some versions don't allow comparing arrays or structures containing arrays
     if (type.containsArray()) {
-        profileRequires(loc, ENoProfile, 120, GL_3DL_array_objects, op);
+        profileRequires(loc, ENoProfile, 120, E_GL_3DL_array_objects, op);
         profileRequires(loc, EEsProfile, 300, nullptr, op);
     }
 }
@@ -3182,11 +3202,11 @@ void TParseContext::finalErrorCheck()
         if (profile == EEsProfile && version == 310)
             requireExtensions(getCurrentLoc(), Num_AEP_tessellation_shader, AEP_tessellation_shader, "tessellation shaders");
         else if (profile != EEsProfile && version < 400)
-            requireExtensions(getCurrentLoc(), 1, &GL_ARB_tessellation_shader, "tessellation shaders");
+            requireExtensions(getCurrentLoc(), 1, &E_GL_ARB_tessellation_shader, "tessellation shaders");
         break;
     case EShLangCompute:
         if (profile != EEsProfile && version < 430)
-            requireExtensions(getCurrentLoc(), 1, &GL_ARB_compute_shader, "tessellation shaders");
+            requireExtensions(getCurrentLoc(), 1, &E_GL_ARB_compute_shader, "tessellation shaders");
         break;
     default:
         break;
@@ -3236,8 +3256,8 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
                 (format > ElfEsIntGuard && format < ElfIntGuard) ||
                 (format > ElfEsUintGuard && format < ElfCount))
                 requireProfile(loc, ENoProfile | ECoreProfile | ECompatibilityProfile, "image load-store format");
-            profileRequires(loc, ENoProfile | ECoreProfile | ECompatibilityProfile, 420, GL_ARB_shader_image_load_store, "image load store");
-            profileRequires(loc, EEsProfile, 310, GL_ARB_shader_image_load_store, "image load store");
+            profileRequires(loc, ENoProfile | ECoreProfile | ECompatibilityProfile, 420, E_GL_ARB_shader_image_load_store, "image load store");
+            profileRequires(loc, EEsProfile, 310, E_GL_ARB_shader_image_load_store, "image load store");
             publicType.qualifier.layoutFormat = format;
             return;
         }
@@ -3332,7 +3352,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
             return;
         }
         if (id == "early_fragment_tests") {
-            profileRequires(loc, ENoProfile | ECoreProfile | ECompatibilityProfile, 420, GL_ARB_shader_image_load_store, "early_fragment_tests");
+            profileRequires(loc, ENoProfile | ECoreProfile | ECompatibilityProfile, 420, E_GL_ARB_shader_image_load_store, "early_fragment_tests");
             profileRequires(loc, EEsProfile, 310, nullptr, "early_fragment_tests");
             publicType.shaderQualifiers.earlyFragmentTests = true;
             return;
@@ -3363,7 +3383,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
         value = constUnion->getConstArray()[0].getIConst();
         if (! constUnion->isLiteral()) {
             requireProfile(loc, ECoreProfile | ECompatibilityProfile, nonLiteralFeature);
-            profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, nonLiteralFeature);
+            profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, nonLiteralFeature);
         }
     } else {
         // grammar should have give out the error message
@@ -3380,7 +3400,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
     if (id == "offset") {
         const char* feature = "uniform offset";
         requireProfile(loc, EEsProfile | ECoreProfile | ECompatibilityProfile, feature);
-        const char* exts[2] = { GL_ARB_enhanced_layouts, GL_ARB_shader_atomic_counters };
+        const char* exts[2] = { E_GL_ARB_enhanced_layouts, E_GL_ARB_shader_atomic_counters };
         profileRequires(loc, ECoreProfile | ECompatibilityProfile, 420, 2, exts, feature);
         profileRequires(loc, EEsProfile, 310, nullptr, feature);
         publicType.qualifier.layoutOffset = value;
@@ -3388,7 +3408,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
     } else if (id == "align") {
         const char* feature = "uniform buffer-member align";
         requireProfile(loc, ECoreProfile | ECompatibilityProfile, feature);
-        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, feature);
+        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, feature);
         // "The specified alignment must be a power of 2, or a compile-time error results."
         if (! IsPow2(value))
             error(loc, "must be a power of 2", "align", "");
@@ -3397,7 +3417,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
         return;
     } else if (id == "location") {
         profileRequires(loc, EEsProfile, 300, nullptr, "location");
-        const char* exts[2] = { GL_ARB_separate_shader_objects, GL_ARB_explicit_attrib_location };
+        const char* exts[2] = { E_GL_ARB_separate_shader_objects, E_GL_ARB_explicit_attrib_location };
         profileRequires(loc, ~EEsProfile, 330, 2, exts, "location");
         if ((unsigned int)value >= TQualifier::layoutLocationEnd)
             error(loc, "location is too large", id.c_str(), "");
@@ -3411,7 +3431,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
             publicType.qualifier.layoutSet = value;
         return;
     } else if (id == "binding") {
-        profileRequires(loc, ~EEsProfile, 420, GL_ARB_shading_language_420pack, "binding");
+        profileRequires(loc, ~EEsProfile, 420, E_GL_ARB_shading_language_420pack, "binding");
         profileRequires(loc, EEsProfile, 310, nullptr, "binding");
         if ((unsigned int)value >= TQualifier::layoutBindingEnd)
             error(loc, "binding is too large", id.c_str(), "");
@@ -3420,7 +3440,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
         return;
     } else if (id == "component") {
         requireProfile(loc, ECoreProfile | ECompatibilityProfile, "component");
-        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, "component");
+        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, "component");
         if ((unsigned)value >= TQualifier::layoutComponentEnd)
             error(loc, "component is too large", id.c_str(), "");
         else
@@ -3435,7 +3455,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
         const char* feature = "transform feedback qualifier";
         requireStage(loc, (EShLanguageMask)(EShLangVertexMask | EShLangGeometryMask | EShLangTessControlMask | EShLangTessEvaluationMask), feature);
         requireProfile(loc, ECoreProfile | ECompatibilityProfile, feature);
-        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, feature);
+        profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, feature);
         if (id == "xfb_buffer") {
             // "It is a compile-time error to specify an *xfb_buffer* that is greater than
             // the implementation-dependent constant gl_MaxTransformFeedbackBuffers."
@@ -3501,7 +3521,7 @@ void TParseContext::setLayoutQualifier(TSourceLoc loc, TPublicType& publicType, 
     case EShLangFragment:
         if (id == "index") {
             requireProfile(loc, ECompatibilityProfile | ECoreProfile, "index layout qualifier on fragment output");
-            const char* exts[2] = { GL_ARB_separate_shader_objects, GL_ARB_explicit_attrib_location };
+            const char* exts[2] = { E_GL_ARB_separate_shader_objects, E_GL_ARB_explicit_attrib_location };
             profileRequires(loc, ECompatibilityProfile | ECoreProfile, 330, 2, exts, "index layout qualifier on fragment output");
             publicType.qualifier.layoutIndex = value;
             return;
@@ -3666,7 +3686,7 @@ void TParseContext::layoutTypeCheck(TSourceLoc loc, const TType& type)
         case EvqVaryingIn:
         case EvqVaryingOut:
             if (type.getBasicType() == EbtBlock)
-                profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, "location qualifier on in/out block");
+                profileRequires(loc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, "location qualifier on in/out block");
             break;
         case EvqUniform:
         case EvqBuffer:
@@ -3794,11 +3814,11 @@ void TParseContext::layoutQualifierCheck(TSourceLoc loc, const TQualifier& quali
             else
                 requireStage(loc, (EShLanguageMask)~EShLangComputeMask, feature);
             if (language == EShLangVertex) {
-                const char* exts[2] = { GL_ARB_separate_shader_objects, GL_ARB_explicit_attrib_location };
+                const char* exts[2] = { E_GL_ARB_separate_shader_objects, E_GL_ARB_explicit_attrib_location };
                 profileRequires(loc, ~EEsProfile, 330, 2, exts, feature);
                 profileRequires(loc, EEsProfile, 300, nullptr, feature);
             } else {
-                profileRequires(loc, ~EEsProfile, 410, GL_ARB_separate_shader_objects, feature);
+                profileRequires(loc, ~EEsProfile, 410, E_GL_ARB_separate_shader_objects, feature);
                 profileRequires(loc, EEsProfile, 310, nullptr, feature);
             }
             break;
@@ -3811,11 +3831,11 @@ void TParseContext::layoutQualifierCheck(TSourceLoc loc, const TQualifier& quali
             else
                 requireStage(loc, (EShLanguageMask)~EShLangComputeMask, feature);
             if (language == EShLangFragment) {
-                const char* exts[2] = { GL_ARB_separate_shader_objects, GL_ARB_explicit_attrib_location };
+                const char* exts[2] = { E_GL_ARB_separate_shader_objects, E_GL_ARB_explicit_attrib_location };
                 profileRequires(loc, ~EEsProfile, 330, 2, exts, feature);
                 profileRequires(loc, EEsProfile, 300, nullptr, feature);
             } else {
-                profileRequires(loc, ~EEsProfile, 410, GL_ARB_separate_shader_objects, feature);
+                profileRequires(loc, ~EEsProfile, 410, E_GL_ARB_separate_shader_objects, feature);
                 profileRequires(loc, EEsProfile, 310, nullptr, feature);
             }
             break;
@@ -4095,7 +4115,7 @@ TIntermNode* TParseContext::declareVariable(TSourceLoc loc, TString& identifier,
             declareArray(loc, identifier, type, symbol, newDeclaration);
 
         if (initializer) {
-            profileRequires(loc, ENoProfile, 120, GL_3DL_array_objects, "initializer");
+            profileRequires(loc, ENoProfile, 120, E_GL_3DL_array_objects, "initializer");
             profileRequires(loc, EEsProfile, 300, nullptr, "initializer");
         }
     } else {
@@ -4234,7 +4254,7 @@ TIntermNode* TParseContext::executeInitializer(TSourceLoc loc, TIntermTyped* ini
         if (initializer->getType().getQualifier().storage != EvqConst) {
             const char* initFeature = "non-constant initializer";
             requireProfile(loc, ~EEsProfile, initFeature);
-            profileRequires(loc, ~EEsProfile, 420, GL_ARB_shading_language_420pack, initFeature);
+            profileRequires(loc, ~EEsProfile, 420, E_GL_ARB_shading_language_420pack, initFeature);
             variable->getWritableType().getQualifier().storage = EvqConstReadOnly;
             qualifier = EvqConstReadOnly;
         }
@@ -4548,7 +4568,7 @@ void TParseContext::declareBlock(TSourceLoc loc, TTypeList& typeList, const TStr
 {
     blockStageIoCheck(loc, currentBlockQualifier);
     if (arraySizes)
-        arrayUnsizedCheck(loc, currentBlockQualifier, arraySizes->getSize(), false);
+        arrayUnsizedCheck(loc, currentBlockQualifier, arraySizes->getOuterSize(), false);
     arrayDimCheck(loc, arraySizes, 0);
 
     // fix and check for member storage qualifiers and types that don't belong within a block
@@ -4568,7 +4588,7 @@ void TParseContext::declareBlock(TSourceLoc loc, TTypeList& typeList, const TStr
             requireProfile(memberLoc, ~EEsProfile, "implicitly-sized array in a block");
         if (memberQualifier.hasOffset()) {
             requireProfile(memberLoc, ~EEsProfile, "offset on block member");
-            profileRequires(memberLoc, ~EEsProfile, 440, GL_ARB_enhanced_layouts, "offset on block member");
+            profileRequires(memberLoc, ~EEsProfile, 440, E_GL_ARB_enhanced_layouts, "offset on block member");
         }
 
         TBasicType basicType = memberType.getBasicType();
@@ -4641,7 +4661,7 @@ void TParseContext::declareBlock(TSourceLoc loc, TTypeList& typeList, const TStr
             case EvqVaryingIn:
             case EvqVaryingOut:
                 requireProfile(memberLoc, ECoreProfile | ECompatibilityProfile | EEsProfile, feature);
-                profileRequires(memberLoc, ECoreProfile | ECompatibilityProfile, 440, GL_ARB_enhanced_layouts, feature);
+                profileRequires(memberLoc, ECoreProfile | ECompatibilityProfile, 440, E_GL_ARB_enhanced_layouts, feature);
                 profileRequires(memberLoc, EEsProfile, 0, Num_AEP_shader_io_blocks, AEP_shader_io_blocks, feature);
                 memberWithLocation = true;
                 break;
@@ -4755,7 +4775,7 @@ void TParseContext::blockStageIoCheck(TSourceLoc loc, const TQualifier& qualifie
         profileRequires(loc, EEsProfile, 310, nullptr, "buffer block");
         break;
     case EvqVaryingIn:
-        profileRequires(loc, ~EEsProfile, 150, GL_ARB_separate_shader_objects, "input block");
+        profileRequires(loc, ~EEsProfile, 150, E_GL_ARB_separate_shader_objects, "input block");
         // It is a compile-time error to have an input block in a vertex shader or an output block in a fragment shader
         // "Compute shaders do not permit user-defined input variables..."
         requireStage(loc, (EShLanguageMask)(EShLangTessControlMask|EShLangTessEvaluationMask|EShLangGeometryMask|EShLangFragmentMask), "input block");
@@ -4763,7 +4783,7 @@ void TParseContext::blockStageIoCheck(TSourceLoc loc, const TQualifier& qualifie
             profileRequires(loc, EEsProfile, 0, Num_AEP_shader_io_blocks, AEP_shader_io_blocks, "fragment input block");
         break;
     case EvqVaryingOut:
-        profileRequires(loc, ~EEsProfile, 150, GL_ARB_separate_shader_objects, "output block");
+        profileRequires(loc, ~EEsProfile, 150, E_GL_ARB_separate_shader_objects, "output block");
         requireStage(loc, (EShLanguageMask)(EShLangVertexMask|EShLangTessControlMask|EShLangTessEvaluationMask|EShLangGeometryMask), "output block");
         // ES 310 can have a block before shader_io is turned on, so skip this test for built-ins
         if (language == EShLangVertex && ! parsingBuiltins)

@@ -52,7 +52,7 @@
 #include "preprocessor/PpTokens.h"
 
 namespace glslang {
-    
+
 // read past any white space
 void TInputScanner::consumeWhiteSpace(bool& foundNonSpaceTab)
 {
@@ -137,13 +137,13 @@ void TInputScanner::consumeWhitespaceComment(bool& foundNonSpaceTab)
 {
     do {
         consumeWhiteSpace(foundNonSpaceTab);
- 
+
         // if not starting a comment now, then done
         int c = peek();
         if (c != '/' || c < 0)
             return;
 
-        // skip potential comment 
+        // skip potential comment
         foundNonSpaceTab = true;
         if (! consumeComment())
             return;
@@ -194,10 +194,10 @@ bool TInputScanner::scanVersion(int& version, EProfile& profile, bool& notFirstT
         }
         lookingInMiddle = true;
 
-        // Nominal start, skipping the desktop allowed comments and white space, but tracking if 
+        // Nominal start, skipping the desktop allowed comments and white space, but tracking if
         // something else was found for ES:
         consumeWhitespaceComment(foundNonSpaceTab);
-        if (foundNonSpaceTab) 
+        if (foundNonSpaceTab)
             versionNotFirst = true;
 
         // "#"
@@ -477,7 +477,7 @@ void TScanContext::fillInKeywordMap()
     (*KeywordMap)["superp"] =                  SUPERP;
 
     ReservedSet = new std::set<std::string>;
-    
+
     ReservedSet->insert("common");
     ReservedSet->insert("partition");
     ReservedSet->insert("active");
@@ -586,7 +586,7 @@ int TScanContext::tokenize(TPpContext* pp, TParserToken& token)
         case CPP_AND_ASSIGN:            return AND_ASSIGN;
         case CPP_OR_ASSIGN:             return OR_ASSIGN;
         case CPP_XOR_ASSIGN:            return XOR_ASSIGN;
-                                   
+
         case CPP_INTCONSTANT:           parserToken->sType.lex.i = ppToken.ival;       return INTCONSTANT;
         case CPP_UINTCONSTANT:          parserToken->sType.lex.i = ppToken.ival;       return UINTCONSTANT;
         case CPP_FLOATCONSTANT:         parserToken->sType.lex.d = ppToken.dval;       return FLOATCONSTANT;
@@ -594,7 +594,7 @@ int TScanContext::tokenize(TPpContext* pp, TParserToken& token)
         case CPP_IDENTIFIER:            return tokenizeIdentifier();
 
         case EOF:                       return 0;
-                                   
+
         default:
             char buf[2];
             buf[0] = (char)ppToken.token;
@@ -679,14 +679,14 @@ int TScanContext::tokenizeIdentifier()
         return keyword;
 
     case BUFFER:
-        if ((parseContext.profile == EEsProfile && parseContext.version < 310) || 
+        if ((parseContext.profile == EEsProfile && parseContext.version < 310) ||
             (parseContext.profile != EEsProfile && parseContext.version < 430))
             return identifierOrType();
         return keyword;
 
     case ATOMIC_UINT:
-        if ((parseContext.profile == EEsProfile && parseContext.version >= 310) ||
-            parseContext.extensionsTurnedOn(1, &GL_ARB_shader_atomic_counters))
+        if (parseContext.profile == EEsProfile && parseContext.version >= 310 ||
+            parseContext.extensionsTurnedOn(1, &E_GL_ARB_shader_atomic_counters))
             return keyword;
         return es30ReservedFromGLSL(420);
 
@@ -696,20 +696,20 @@ int TScanContext::tokenizeIdentifier()
     case WRITEONLY:
         if (parseContext.profile == EEsProfile && parseContext.version >= 310)
             return keyword;
-        return es30ReservedFromGLSL(parseContext.extensionsTurnedOn(1, &GL_ARB_shader_image_load_store) ? 130 : 420);
+        return es30ReservedFromGLSL(parseContext.extensionsTurnedOn(1, &E_GL_ARB_shader_image_load_store) ? 130 : 420);
 
     case VOLATILE:
         if (parseContext.profile == EEsProfile && parseContext.version >= 310)
             return keyword;
-        if (! parseContext.symbolTable.atBuiltInLevel() && (parseContext.profile == EEsProfile || (parseContext.version < 420 && ! parseContext.extensionsTurnedOn(1, &GL_ARB_shader_image_load_store))))
+        if (! parseContext.symbolTable.atBuiltInLevel() && (parseContext.profile == EEsProfile || (parseContext.version < 420 && ! parseContext.extensionsTurnedOn(1, &E_GL_ARB_shader_image_load_store))))
             reservedWord();
         return keyword;
 
     case LAYOUT:
     {
         const int numLayoutExts = 2;
-        const char* layoutExts[numLayoutExts] = { GL_ARB_shading_language_420pack,
-                                                  GL_ARB_explicit_attrib_location };
+        const char* layoutExts[numLayoutExts] = { E_GL_ARB_shading_language_420pack,
+                                                  E_GL_ARB_explicit_attrib_location };
         if ((parseContext.profile == EEsProfile && parseContext.version < 300) ||
             (parseContext.profile != EEsProfile && parseContext.version < 140 &&
             ! parseContext.extensionsTurnedOn(numLayoutExts, layoutExts)))
@@ -725,7 +725,7 @@ int TScanContext::tokenizeIdentifier()
     case PATCH:
         if (parseContext.symbolTable.atBuiltInLevel() ||
             (parseContext.profile == EEsProfile && parseContext.extensionsTurnedOn(Num_AEP_tessellation_shader, AEP_tessellation_shader)) ||
-            (parseContext.profile != EEsProfile && parseContext.extensionsTurnedOn(1, &GL_ARB_tessellation_shader)))
+            (parseContext.profile != EEsProfile && parseContext.extensionsTurnedOn(1, &E_GL_ARB_tessellation_shader)))
             return keyword;
 
         return es30ReservedFromGLSL(400);
@@ -748,7 +748,7 @@ int TScanContext::tokenizeIdentifier()
     case MAT3X4:
     case MAT4X2:
     case MAT4X3:
-    case MAT4X4:        
+    case MAT4X4:
         return matNxM();
 
     case DMAT2:
@@ -795,7 +795,7 @@ int TScanContext::tokenizeIdentifier()
 
     case IMAGECUBEARRAY:
     case IIMAGECUBEARRAY:
-    case UIMAGECUBEARRAY:        
+    case UIMAGECUBEARRAY:
     case IMAGE2DMS:
     case IIMAGE2DMS:
     case UIMAGE2DMS:
@@ -818,7 +818,7 @@ int TScanContext::tokenizeIdentifier()
     case ISAMPLERCUBEARRAY:
     case USAMPLERCUBEARRAY:
         afterType = true;
-        if (parseContext.profile == EEsProfile || (parseContext.version < 400 && ! parseContext.extensionsTurnedOn(1, &GL_ARB_texture_cube_map_array)))
+        if (parseContext.profile == EEsProfile || (parseContext.version < 400 && ! parseContext.extensionsTurnedOn(1, &E_GL_ARB_texture_cube_map_array)))
             reservedWord();
         return keyword;
 
@@ -848,14 +848,14 @@ int TScanContext::tokenizeIdentifier()
     case USAMPLER2DARRAY:
         afterType = true;
         return nonreservedKeyword(300, 130);
-        
+
     case ISAMPLER2DRECT:
     case USAMPLER2DRECT:
     case ISAMPLERBUFFER:
     case USAMPLERBUFFER:
         afterType = true;
         return es30ReservedFromGLSL(140);
-        
+
     case SAMPLER2DMS:
     case ISAMPLER2DMS:
     case USAMPLER2DMS:
@@ -880,7 +880,7 @@ int TScanContext::tokenizeIdentifier()
     case SAMPLER3D:
         afterType = true;
         if (parseContext.profile == EEsProfile && parseContext.version < 300) {
-            if (! parseContext.extensionsTurnedOn(1, &GL_OES_texture_3D))
+            if (! parseContext.extensionsTurnedOn(1, &E_GL_OES_texture_3D))
                 reservedWord();
         }
         return keyword;
@@ -896,9 +896,9 @@ int TScanContext::tokenizeIdentifier()
         afterType = true;
         if (parseContext.profile == EEsProfile)
             reservedWord();
-        else if (parseContext.version < 140 && ! parseContext.symbolTable.atBuiltInLevel() && ! parseContext.extensionsTurnedOn(1, &GL_ARB_texture_rectangle)) {
+        else if (parseContext.version < 140 && ! parseContext.symbolTable.atBuiltInLevel() && ! parseContext.extensionsTurnedOn(1, &E_GL_ARB_texture_rectangle)) {
             if (parseContext.messages & EShMsgRelaxedErrors)
-                parseContext.requireExtensions(loc, 1, &GL_ARB_texture_rectangle, "texture-rectangle sampler keyword");
+                parseContext.requireExtensions(loc, 1, &E_GL_ARB_texture_rectangle, "texture-rectangle sampler keyword");
             else
                 reservedWord();
         }
@@ -915,13 +915,13 @@ int TScanContext::tokenizeIdentifier()
 
     case SAMPLEREXTERNALOES:
         afterType = true;
-        if (parseContext.symbolTable.atBuiltInLevel() || parseContext.extensionsTurnedOn(1, &GL_OES_EGL_image_external))
+        if (parseContext.symbolTable.atBuiltInLevel() || parseContext.extensionsTurnedOn(1, &E_GL_OES_EGL_image_external))
             return keyword;
         return identifierOrType();
 
     case NOPERSPECTIVE:
         return es30ReservedFromGLSL(130);
-        
+
     case SMOOTH:
         if ((parseContext.profile == EEsProfile && parseContext.version < 300) ||
             (parseContext.profile != EEsProfile && parseContext.version < 130))
@@ -970,7 +970,7 @@ int TScanContext::tokenizeIdentifier()
         bool reserved = parseContext.profile == EEsProfile || parseContext.version >= 130;
         return identifierOrReserved(reserved);
     }
-    
+
     default:
         parseContext.infoSink.info.message(EPrefixInternalError, "Unknown glslang keyword", loc);
         return 0;
@@ -982,7 +982,7 @@ int TScanContext::identifierOrType()
     parserToken->sType.lex.string = NewPoolTString(tokenText);
     if (field) {
         field = false;
- 
+
         return FIELD_SELECTION;
     }
 
@@ -1106,8 +1106,8 @@ int TScanContext::firstGenerationImage(bool inEs310)
 {
     afterType = true;
 
-    if (parseContext.symbolTable.atBuiltInLevel() || 
-        (parseContext.profile != EEsProfile && (parseContext.version >= 420 || parseContext.extensionsTurnedOn(1, &GL_ARB_shader_image_load_store))) ||                                                     
+    if (parseContext.symbolTable.atBuiltInLevel() ||
+        (parseContext.profile != EEsProfile && (parseContext.version >= 420 || parseContext.extensionsTurnedOn(1, &E_GL_ARB_shader_image_load_store))) ||
         (inEs310 && parseContext.profile == EEsProfile && parseContext.version >= 310))
         return keyword;
 
@@ -1133,9 +1133,9 @@ int TScanContext::secondGenerationImage()
         return keyword;
     }
 
-    if (parseContext.symbolTable.atBuiltInLevel() || 
-        (parseContext.profile != EEsProfile && 
-         (parseContext.version >= 420 || parseContext.extensionsTurnedOn(1, &GL_ARB_shader_image_load_store))))
+    if (parseContext.symbolTable.atBuiltInLevel() ||
+        (parseContext.profile != EEsProfile &&
+         (parseContext.version >= 420 || parseContext.extensionsTurnedOn(1, &E_GL_ARB_shader_image_load_store))))
         return keyword;
 
     if (parseContext.forwardCompatible)
